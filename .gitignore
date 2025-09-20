@@ -6,3 +6,4 @@ parser/.venv/
 .DS_Store
 frontend/.env.production
 database/
+proxy/config.json

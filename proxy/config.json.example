@@ -1,0 +1,51 @@
+{
+    "inbounds": [
+      {
+        "tag": "socks-in",
+        "protocol": "socks",
+        "listen": "127.0.0.1",
+        "port": 1080,
+        "settings": {
+          "udp": true
+        }
+      },
+      {
+        "tag": "http-in",
+        "protocol": "http",
+        "listen": "127.0.0.1",
+        "port": 8080
+      }
+    ],
+    "outbounds": [
+      {
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "address.domain.com",
+              "port": 443,
+              "users": [
+                {
+                  "id": "useruuid",
+                  "flow": "xtls-rprx-vision",
+                  "encryption": "none",
+                  "level": 0
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "security": "reality",
+          "realitySettings": {
+            "fingerprint": "chrome",
+            "serverName": "address.somedomain.com",
+            "publicKey": "public_key",
+            "shortId": "SID"
+          }
+        }
+      }
+    ]
+  }
