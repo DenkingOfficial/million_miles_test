@@ -5,3 +5,4 @@ parser/.venv/
 .env
 .DS_Store
 frontend/.env.production
+database/

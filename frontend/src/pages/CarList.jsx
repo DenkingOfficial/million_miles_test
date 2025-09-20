@@ -18,13 +18,29 @@ const CarList = () => {
   const loadCars = async (offset = 0) => {
     try {
       setLoading(true);
-      const carsData = await carService.getCars({ 
+      const response = await carService.getCars({ 
         ...filters, 
         offset,
         limit: 20 
       });
 
-      console.log(carsData)
+      console.log('API Response:', response);
+      
+      let carsData;
+      if (Array.isArray(response)) {
+        carsData = response;
+      } else if (response && Array.isArray(response.cars)) {
+        carsData = response.cars;
+      } else if (response && Array.isArray(response.data)) {
+        carsData = response.data;
+      } else if (response && Array.isArray(response.results)) {
+        carsData = response.results;
+      } else {
+        console.warn('Unexpected API response structure:', response);
+        carsData = [];
+      }
+
+      console.log('Processed cars data:', carsData);
       
       if (offset === 0) {
         setCars(carsData);
@@ -37,6 +53,9 @@ const CarList = () => {
     } catch (err) {
       setError('Failed to load car listings.');
       console.error('Error loading cars:', err);
+      if (offset === 0) {
+        setCars([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -80,18 +99,18 @@ const CarList = () => {
             ) : (
               <>
                 <div className="cars-grid">
-                  {cars.map(car => (
+                  {Array.isArray(cars) && cars.map(car => (
                     <CarCard key={car.id} car={car} />
                   ))}
                 </div>
 
-                {cars.length === 0 && !loading && (
+                {(!Array.isArray(cars) || cars.length === 0) && !loading && (
                   <div className="no-results">
                     Нет авто по вашим критериям.
                   </div>
                 )}
 
-                {hasMore && cars.length > 0 && (
+                {hasMore && Array.isArray(cars) && cars.length > 0 && (
                   <div className="load-more">
                     <button 
                       onClick={loadMore} 
