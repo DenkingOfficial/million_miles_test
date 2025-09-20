@@ -8,5 +8,11 @@
   "flake8.args": ["--ignore=E203,E501,W503,E701,E226"],
   "editor.defaultFormatter": "ms-python.black-formatter",
   "editor.formatOnSave": true,
-  "editor.wordBasedSuggestions": "off"
+  "editor.wordBasedSuggestions": "off",
+  "[css]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  }
 }

@@ -47,7 +47,7 @@ const CarDetail = () => {
     if (!car?.photos || !Array.isArray(car.photos)) {
       return [getImageUrl(car?.photo)];
     }
-    
+
     return car.photos.map(photo => getImageUrl(car.photo, photo.type));
   };
 
@@ -79,19 +79,19 @@ const CarDetail = () => {
     <div className="car-detail-page">
       <div className="container">
         <Link to="/" className="back-link">← Обратно к списку</Link>
-        
+
         <div className="car-detail">
           <div className="car-images">
             <div className="main-image">
-              <img 
-                src={images[currentImageIndex]} 
+              <img
+                src={images[currentImageIndex]}
                 alt={`${car.manufacturer} ${car.model}`}
                 onError={(e) => {
                   e.target.src = '/placeholder-car.jpg';
                 }}
               />
             </div>
-            
+
             {images.length > 1 && (
               <div className="image-thumbnails">
                 {images.map((image, index) => (
@@ -116,12 +116,12 @@ const CarDetail = () => {
               <div className="car-price">{formatPrice(car.price)}</div>
             </div>
 
-            <div className="car-badge">
+            <div className="car-badge-section">
               <h2>{car.badge}</h2>
               {car.badge_detail && <p>{car.badge_detail}</p>}
             </div>
 
-            <div className="car-specs">
+            <div className="info-section">
               <h3>Информация об авто</h3>
               <div className="specs-grid">
                 <div className="spec-item">
@@ -151,7 +151,7 @@ const CarDetail = () => {
               </div>
             </div>
 
-            <div className="dealer-info">
+            <div className="info-section">
               <h3>Информация о продавце</h3>
               <div className="dealer-details">
                 <div className="dealer-item">
@@ -170,22 +170,22 @@ const CarDetail = () => {
             </div>
 
             {car.service_mark && car.service_mark.length > 0 && (
-              <div className="service-marks">
+              <div className="info-section">
                 <h3>Проведенное обслуживание</h3>
-                <div className="marks">
+                <div className="tags">
                   {car.service_mark.map((mark, index) => (
-                    <span key={index} className="mark">{mark}</span>
+                    <span key={index} className="tag">{mark}</span>
                   ))}
                 </div>
               </div>
             )}
 
             {car.condition && car.condition.length > 0 && (
-              <div className="condition-info">
+              <div className="info-section">
                 <h3>Состояние авто</h3>
-                <div className="conditions">
+                <div className="tags">
                   {car.condition.map((cond, index) => (
-                    <span key={index} className="condition">{cond}</span>
+                    <span key={index} className="tag condition">{cond}</span>
                   ))}
                 </div>
               </div>

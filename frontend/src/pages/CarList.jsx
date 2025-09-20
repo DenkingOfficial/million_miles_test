@@ -18,14 +18,14 @@ const CarList = () => {
   const loadCars = async (offset = 0) => {
     try {
       setLoading(true);
-      const response = await carService.getCars({ 
-        ...filters, 
+      const response = await carService.getCars({
+        ...filters,
         offset,
-        limit: 20 
+        limit: 20
       });
 
       console.log('API Response:', response);
-      
+
       let carsData;
       if (Array.isArray(response)) {
         carsData = response;
@@ -41,17 +41,17 @@ const CarList = () => {
       }
 
       console.log('Processed cars data:', carsData);
-      
+
       if (offset === 0) {
         setCars(carsData);
       } else {
         setCars(prev => [...prev, ...carsData]);
       }
-      
+
       setHasMore(carsData.length === 20);
       setError(null);
     } catch (err) {
-      setError('Failed to load car listings.');
+      setError('Не удалось загрузить список автомобилей.');
       console.error('Error loading cars:', err);
       if (offset === 0) {
         setCars([]);
@@ -84,10 +84,10 @@ const CarList = () => {
     <div className="car-list-page">
       <div className="container">
         <h1>Парсинг Encar</h1>
-        
+
         <div className="content">
           <aside>
-            <Filters 
+            <Filters
               onFiltersChange={handleFiltersChange}
               currentFilters={filters}
             />
@@ -112,8 +112,8 @@ const CarList = () => {
 
                 {hasMore && Array.isArray(cars) && cars.length > 0 && (
                   <div className="load-more">
-                    <button 
-                      onClick={loadMore} 
+                    <button
+                      onClick={loadMore}
                       disabled={loading}
                       className="load-more-btn"
                     >
