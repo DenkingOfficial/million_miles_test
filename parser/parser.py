@@ -5,6 +5,7 @@ from typing import Dict, List, Set
 from datetime import datetime
 from dataclasses import dataclass
 import uuid
+import ssl
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,22 +30,21 @@ class EncarAPI:
 
     def _setup_headers(self):
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
             "Origin": "https://www.encar.com",
             "Pragma": "no-cache",
             "Referer": "https://www.encar.com/",
             "Sec-Ch-Ua": '"Not=A?Brand";v="24", "Chromium";v="140"',
             "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"macOS"',
+            "Sec-Ch-Ua-Platform": '"Linux"',
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
             "DNT": "1",
-            "Priority": "u=1, i",
             "Connection": "keep-alive",
         }
         logger.debug(f"🔧 Setup headers: {len(headers)} headers configured")
@@ -58,6 +58,7 @@ class EncarAPI:
         sort_option="PriceAsc",
         query="q=(Or.CarType.N._.CarType.Y.)",
         include_count=True,
+        max_retries=3,
     ):
         base_url = f"{self.BASE_URL}/premium"
         url_parts = []
@@ -73,21 +74,42 @@ class EncarAPI:
         
         logger.debug(f"Making request to: {url}")
 
-        try:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                data = await response.json()
-                
-                search_results = data.get("SearchResults", [])
-                total_count = data.get("Count", 0)
-                
-                logger.debug(f"API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
-                
-                return data, query, sort_option, page, limit
-                
-        except Exception as e:
-            logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
-            raise
+        for attempt in range(max_retries):
+            try:
+                async with session.get(url) as response:
+                    if response.status == 407:
+                        logger.warning(f"Proxy auth required on attempt {attempt + 1}, retrying...")
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                        
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    search_results = data.get("SearchResults", [])
+                    total_count = data.get("Count", 0)
+                    
+                    logger.debug(f"API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
+                    
+                    return data, query, sort_option, page, limit
+                    
+            except aiohttp.ClientProxyConnectionError as e:
+                logger.warning(f"Proxy connection error on attempt {attempt + 1}: {e}")
+                await asyncio.sleep(2 ** attempt)
+            except aiohttp.ClientError as e:
+                if "407" in str(e) or "proxy" in str(e).lower():
+                    logger.warning(f"Proxy error on attempt {attempt + 1}: {e}")
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
+                    if attempt == max_retries - 1:
+                        raise
+            except Exception as e:
+                logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(1)
+
+        raise Exception(f"Failed after {max_retries} attempts")
 
 
 class EncarParser:
@@ -241,15 +263,22 @@ class EncarParser:
                     logger.info(f"{config_name} - Progress: {page} pages, {len(all_cars)} cars")
 
                 page += 1
-                await asyncio.sleep(0.03)
+                await asyncio.sleep(0.1)
 
             except Exception as e:
                 consecutive_failures += 1
                 logger.error(f"{config_name} - Page {page} failed (consecutive: {consecutive_failures}): {e}")
                 page += 1
+                await asyncio.sleep(2)
 
         logger.info(f"{config_name} completed: {len(all_cars)} cars from {page} pages")
         return all_cars, config_name
+
+    def _create_ssl_context(self):
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        return ssl_context
 
     async def parse_all_configurations(self):
         session_id = str(uuid.uuid4())
@@ -260,10 +289,23 @@ class EncarParser:
 
         try:
             headers = self.api._setup_headers()
+            
             connector = aiohttp.TCPConnector(
-                limit=self.max_concurrent, limit_per_host=self.max_concurrent
+                limit=self.max_concurrent,
+                limit_per_host=self.max_concurrent,
+                ttl_dns_cache=300,
+                use_dns_cache=True,
+                ssl=False,
+                enable_cleanup_closed=True,
+                force_close=True,
+                keepalive_timeout=30,
             )
-            timeout = aiohttp.ClientTimeout(total=30)
+            
+            timeout = aiohttp.ClientTimeout(
+                total=60,
+                connect=30,
+                sock_read=30
+            )
             
             logger.info(f"HTTP session configured - Concurrent limit: {self.max_concurrent}")
 
@@ -272,7 +314,10 @@ class EncarParser:
             total_configs = len(self.queries) * len(self.sort_options) * len(self.page_sizes)
 
             async with aiohttp.ClientSession(
-                headers=headers, connector=connector, timeout=timeout
+                headers=headers, 
+                connector=connector, 
+                timeout=timeout,
+                trust_env=False,
             ) as session:
                 logger.info(f"HTTP session started")
                 
@@ -288,7 +333,7 @@ class EncarParser:
                 logger.info(f"Created {len(tasks)} configuration tasks")
                 logger.info(f"Starting parallel execution...")
 
-                batch_size = min(self.max_concurrent, 20)
+                batch_size = min(self.max_concurrent, 10)
                 
                 for i in range(0, len(tasks), batch_size):
                     batch = tasks[i:i + batch_size]
@@ -324,7 +369,7 @@ class EncarParser:
                                 logger.info(f"Progress: {completed_configs}/{total_configs} ({progress:.1f}%) - {len(all_current_cars)} unique cars - {elapsed:.1f}s elapsed")
                         
                         if i + batch_size < len(tasks):
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(2)
                             
                     except Exception as e:
                         logger.error(f"Batch {batch_num} failed: {e}")
