@@ -37,6 +37,8 @@ def get_cars(
     min_year: Optional[float] = Query(None),
     max_year: Optional[float] = Query(None),
     office_city_state: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query("id"),
+    sort_order: Optional[str] = Query("asc"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
@@ -59,6 +61,20 @@ def get_cars(
         query = query.filter(models.Car.year <= max_year)
     if office_city_state:
         query = query.filter(models.Car.office_city_state.ilike(f"%{office_city_state}%"))
+
+    valid_sort_fields = {
+        "id": models.Car.id,
+        "price": models.Car.price,
+        "year": models.Car.year,
+        "manufacturer": models.Car.manufacturer
+    }
+    
+    sort_field = valid_sort_fields.get(sort_by, models.Car.id)
+    
+    if sort_order.lower() == "desc":
+        query = query.order_by(sort_field.desc(), models.Car.id.desc())
+    else:
+        query = query.order_by(sort_field.asc(), models.Car.id.asc())
 
     cars = query.offset(offset).limit(limit).all()
     return cars
