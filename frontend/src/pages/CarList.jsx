@@ -3,6 +3,7 @@ import CarCard from '../components/CarCard';
 import Filters from '../components/Filters';
 import { carService } from '../services/api';
 import './CarList.css';
+import SortControls from '../components/SortControls';
 
 const CarList = () => {
   const [cars, setCars] = useState([]);
@@ -10,16 +11,19 @@ const CarList = () => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [hasMore, setHasMore] = useState(true);
+  const [sort, setSort] = useState({ sortBy: 'id', sortOrder: 'asc' });
 
   useEffect(() => {
     loadCars();
-  }, [filters]);
+  }, [filters, sort]);
 
   const loadCars = async (offset = 0) => {
     try {
       setLoading(true);
       const response = await carService.getCars({
         ...filters,
+        sort_by: sort.sortBy,
+        sort_order: sort.sortOrder,
         offset,
         limit: 20
       });
@@ -71,6 +75,10 @@ const CarList = () => {
     setFilters(newFilters);
   };
 
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+  };
+
   if (error) {
     return (
       <div className="error-message">
@@ -94,6 +102,11 @@ const CarList = () => {
           </aside>
 
           <main className="main-content">
+            <SortControls
+              onSortChange={handleSortChange}
+              currentSort={sort}
+            />
+
             {loading && cars.length === 0 ? (
               <div className="loading">Загрузка объявлений...</div>
             ) : (
