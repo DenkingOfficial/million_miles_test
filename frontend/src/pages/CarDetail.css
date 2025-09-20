@@ -1,13 +1,6 @@
 .car-detail-page {
     min-height: 100vh;
     background-color: #f8f9fa;
-    padding: 20px 0;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
 }
 
 .back-link {
