@@ -297,7 +297,6 @@ class EncarParser:
                 use_dns_cache=True,
                 ssl=False,
                 enable_cleanup_closed=True,
-                force_close=True,
                 keepalive_timeout=30,
             )
             
