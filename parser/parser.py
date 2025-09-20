@@ -6,8 +6,6 @@ from datetime import datetime
 from dataclasses import dataclass
 import uuid
 import ssl
-import subprocess
-import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,15 +28,12 @@ class ParseResult:
 class EncarAPI:
     BASE_URL = "https://api.encar.com/search/car/list"
 
-    def __init__(self):
-        self.use_curl_fallback = False
-
     def _setup_headers(self):
         headers = {
-            "User-Agent": "Mozilla/5.0 (Linux x86_64; ko-KR) AppleWebKit/603.16 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/601",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Encoding": "gzip, deflate, br",
-            "Accept-Language": "Accept-Language: ko-KR,ko;q=0.9,en;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
             "Cache-Control": "no-cache",
             "Origin": "https://www.encar.com",
             "Pragma": "no-cache",
@@ -55,83 +50,7 @@ class EncarAPI:
         logger.debug(f"🔧 Setup headers: {len(headers)} headers configured")
         return headers
 
-    async def search_premium_curl_fallback(
-        self,
-        page=0,
-        limit=500,
-        sort_option="PriceAsc",
-        query="q=(Or.CarType.N._.CarType.Y.)",
-        include_count=True,
-    ):
-        """Fallback method using curl subprocess"""
-        base_url = f"{self.BASE_URL}/premium"
-        url_parts = []
-
-        if include_count:
-            url_parts.append("count=true")
-        url_parts.append(query)
-
-        offset = page * limit
-        url_parts.append(f"sr=|{sort_option}|{offset}|{limit}")
-
-        url = f"{base_url}?{'&'.join(url_parts)}"
-        
-        logger.debug(f"Making curl request to: {url}")
-
-        cmd = [
-            'curl', '-s', '--max-time', '30', '--retry', '2',
-            '-H', 'accept: application/json, text/javascript, */*; q=0.01',
-            '-H', 'accept-language: en-US,en;q=0.9',
-            '-H', 'cache-control: no-cache',
-            '-H', 'origin: https://www.encar.com',
-            '-H', 'pragma: no-cache',
-            '-H', 'referer: https://www.encar.com/',
-            '-H', 'sec-ch-ua: "Not=A?Brand";v="24", "Chromium";v="140"',
-            '-H', 'sec-ch-ua-mobile: ?0',
-            '-H', 'sec-ch-ua-platform: "Linux"',
-            '-H', 'sec-fetch-dest: empty',
-            '-H', 'sec-fetch-mode: cors',
-            '-H', 'sec-fetch-site: same-site',
-            '-H', 'dnt: 1',
-            '-H', 'connection: keep-alive',
-            '-H', 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-            url
-        ]
-        
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=35)
-            
-            if process.returncode == 0:
-                try:
-                    data = json.loads(stdout.decode('utf-8'))
-                    search_results = data.get("SearchResults", [])
-                    total_count = data.get("Count", 0)
-                    
-                    logger.debug(f"Curl API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
-                    return data, query, sort_option, page, limit
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON from curl response: {e}")
-                    logger.debug(f"Raw response: {stdout.decode('utf-8')[:500]}...")
-                    raise Exception(f"Invalid JSON response from curl: {e}")
-            else:
-                error_msg = stderr.decode('utf-8') if stderr else "Unknown curl error"
-                logger.error(f"Curl failed with return code {process.returncode}: {error_msg}")
-                raise Exception(f"Curl failed: {error_msg}")
-                
-        except asyncio.TimeoutError:
-            logger.error(f"Curl request timed out for page {page}")
-            raise Exception("Curl request timed out")
-        except Exception as e:
-            logger.error(f"Curl subprocess failed: {e}")
-            raise
-
-    async def search_premium_aiohttp(
+    async def search_premium_async(
         self,
         session,
         page=0,
@@ -139,9 +58,8 @@ class EncarAPI:
         sort_option="PriceAsc",
         query="q=(Or.CarType.N._.CarType.Y.)",
         include_count=True,
-        max_retries=2,
+        max_retries=3,
     ):
-        """Original aiohttp implementation"""
         base_url = f"{self.BASE_URL}/premium"
         url_parts = []
 
@@ -154,15 +72,15 @@ class EncarAPI:
 
         url = f"{base_url}?{'&'.join(url_parts)}"
         
-        logger.debug(f"Making aiohttp request to: {url}")
+        logger.debug(f"Making request to: {url}")
 
         for attempt in range(max_retries):
             try:
                 async with session.get(url) as response:
                     if response.status == 407:
-                        logger.warning(f"Proxy auth required on attempt {attempt + 1}, switching to curl fallback")
-                        self.use_curl_fallback = True
-                        raise aiohttp.ClientProxyConnectionError("Proxy authentication required")
+                        logger.warning(f"Proxy auth required on attempt {attempt + 1}, retrying...")
+                        await asyncio.sleep(2 ** attempt)
+                        continue
                         
                     response.raise_for_status()
                     data = await response.json()
@@ -170,19 +88,17 @@ class EncarAPI:
                     search_results = data.get("SearchResults", [])
                     total_count = data.get("Count", 0)
                     
-                    logger.debug(f"Aiohttp API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
+                    logger.debug(f"API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
                     
                     return data, query, sort_option, page, limit
                     
             except aiohttp.ClientProxyConnectionError as e:
                 logger.warning(f"Proxy connection error on attempt {attempt + 1}: {e}")
-                self.use_curl_fallback = True
-                raise
+                await asyncio.sleep(2 ** attempt)
             except aiohttp.ClientError as e:
                 if "407" in str(e) or "proxy" in str(e).lower():
                     logger.warning(f"Proxy error on attempt {attempt + 1}: {e}")
-                    self.use_curl_fallback = True
-                    raise
+                    await asyncio.sleep(2 ** attempt)
                 else:
                     logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
                     if attempt == max_retries - 1:
@@ -195,40 +111,9 @@ class EncarAPI:
 
         raise Exception(f"Failed after {max_retries} attempts")
 
-    async def search_premium_async(
-        self,
-        session,
-        page=0,
-        limit=500,
-        sort_option="PriceAsc",
-        query="q=(Or.CarType.N._.CarType.Y.)",
-        include_count=True,
-    ):
-        """Main method that tries aiohttp first, then falls back to curl"""
-        
-        if self.use_curl_fallback:
-            try:
-                return await self.search_premium_curl_fallback(page, limit, sort_option, query, include_count)
-            except Exception as e:
-                logger.warning(f"Curl fallback failed, trying aiohttp: {e}")
-                self.use_curl_fallback = False
-        
-        try:
-            return await self.search_premium_aiohttp(session, page, limit, sort_option, query, include_count)
-        except Exception as e:
-            if "407" in str(e) or "proxy" in str(e).lower() or isinstance(e, aiohttp.ClientProxyConnectionError):
-                logger.warning(f"Aiohttp failed with proxy error, falling back to curl: {e}")
-                try:
-                    return await self.search_premium_curl_fallback(page, limit, sort_option, query, include_count)
-                except Exception as curl_e:
-                    logger.error(f"Both aiohttp and curl failed. Aiohttp: {e}, Curl: {curl_e}")
-                    raise Exception(f"Both methods failed - Aiohttp: {e}, Curl: {curl_e}")
-            else:
-                raise
-
 
 class EncarParser:
-    def __init__(self, max_concurrent=5):
+    def __init__(self, max_concurrent=10):
         self.max_concurrent = max_concurrent
         self.api = EncarAPI()
 
@@ -331,7 +216,7 @@ class EncarParser:
         logger.debug(f"Config {config_name} - Max pages: {estimated_max_pages}")
 
         while (
-            consecutive_failures < 5
+            consecutive_failures < 3
             and consecutive_empty_pages < 3
             and consecutive_duplicate_pages < 2
             and page < estimated_max_pages
@@ -378,11 +263,7 @@ class EncarParser:
                     logger.info(f"{config_name} - Progress: {page} pages, {len(all_cars)} cars")
 
                 page += 1
-                
-                if self.api.use_curl_fallback:
-                    await asyncio.sleep(0.2)
-                else:
-                    await asyncio.sleep(0.1)
+                await asyncio.sleep(0.1)
 
             except Exception as e:
                 consecutive_failures += 1
@@ -390,8 +271,7 @@ class EncarParser:
                 page += 1
                 await asyncio.sleep(2)
 
-        method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
-        logger.info(f"{config_name} completed using {method_used}: {len(all_cars)} cars from {page} pages")
+        logger.info(f"{config_name} completed: {len(all_cars)} cars from {page} pages")
         return all_cars, config_name
 
     def _create_ssl_context(self):
@@ -452,7 +332,7 @@ class EncarParser:
                 logger.info(f"Created {len(tasks)} configuration tasks")
                 logger.info(f"Starting parallel execution...")
 
-                batch_size = min(self.max_concurrent, 8)
+                batch_size = min(self.max_concurrent, 10)
                 
                 for i in range(0, len(tasks), batch_size):
                     batch = tasks[i:i + batch_size]
@@ -485,21 +365,18 @@ class EncarParser:
                             if completed_configs % 10 == 0:
                                 elapsed = (datetime.now() - start_time).total_seconds()
                                 progress = (completed_configs / total_configs) * 100
-                                method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
-                                logger.info(f"Progress: {completed_configs}/{total_configs} ({progress:.1f}%) - {len(all_current_cars)} unique cars - {elapsed:.1f}s elapsed - Method: {method_used}")
+                                logger.info(f"Progress: {completed_configs}/{total_configs} ({progress:.1f}%) - {len(all_current_cars)} unique cars - {elapsed:.1f}s elapsed")
                         
                         if i + batch_size < len(tasks):
-                            delay = 3 if self.api.use_curl_fallback else 2
-                            await asyncio.sleep(delay)
+                            await asyncio.sleep(2)
                             
                     except Exception as e:
                         logger.error(f"Batch {batch_num} failed: {e}")
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
             
-            logger.info(f"Parse session completed using {method_used}!")
+            logger.info(f"Parse session completed!")
             logger.info(f"Duration: {duration:.2f} seconds ({duration/60:.1f} minutes)")
             logger.info(f"Total unique cars found: {len(all_current_cars)}")
             logger.info(f"Configurations completed: {completed_configs}/{total_configs}")
