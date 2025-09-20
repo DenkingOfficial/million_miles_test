@@ -5,9 +5,6 @@ from typing import Dict, List, Set
 from datetime import datetime
 from dataclasses import dataclass
 import uuid
-import ssl
-import subprocess
-import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,170 +27,25 @@ class ParseResult:
 class EncarAPI:
     BASE_URL = "https://api.encar.com/search/car/list"
 
-    def __init__(self):
-        self.use_curl_fallback = False
-
     def _setup_headers(self):
         headers = {
-            "User-Agent": "Mozilla/5.0 (Linux x86_64; ko-KR) AppleWebKit/603.16 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/601",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Accept-Language": "Accept-Language: ko-KR,ko;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
             "Cache-Control": "no-cache",
             "Origin": "https://www.encar.com",
             "Pragma": "no-cache",
             "Referer": "https://www.encar.com/",
             "Sec-Ch-Ua": '"Not=A?Brand";v="24", "Chromium";v="140"',
             "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Linux"',
+            "Sec-Ch-Ua-Platform": '"macOS"',
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
-            "DNT": "1",
-            "Connection": "keep-alive",
         }
         logger.debug(f"🔧 Setup headers: {len(headers)} headers configured")
         return headers
-
-    async def search_premium_curl_fallback(
-        self,
-        page=0,
-        limit=500,
-        sort_option="PriceAsc",
-        query="q=(Or.CarType.N._.CarType.Y.)",
-        include_count=True,
-    ):
-        """Fallback method using curl subprocess"""
-        base_url = f"{self.BASE_URL}/premium"
-        url_parts = []
-
-        if include_count:
-            url_parts.append("count=true")
-        url_parts.append(query)
-
-        offset = page * limit
-        url_parts.append(f"sr=|{sort_option}|{offset}|{limit}")
-
-        url = f"{base_url}?{'&'.join(url_parts)}"
-        
-        logger.debug(f"Making curl request to: {url}")
-
-        cmd = [
-            'curl', '-s', '--max-time', '30', '--retry', '2',
-            '-H', 'accept: application/json, text/javascript, */*; q=0.01',
-            '-H', 'accept-language: en-US,en;q=0.9',
-            '-H', 'cache-control: no-cache',
-            '-H', 'origin: https://www.encar.com',
-            '-H', 'pragma: no-cache',
-            '-H', 'referer: https://www.encar.com/',
-            '-H', 'sec-ch-ua: "Not=A?Brand";v="24", "Chromium";v="140"',
-            '-H', 'sec-ch-ua-mobile: ?0',
-            '-H', 'sec-ch-ua-platform: "Linux"',
-            '-H', 'sec-fetch-dest: empty',
-            '-H', 'sec-fetch-mode: cors',
-            '-H', 'sec-fetch-site: same-site',
-            '-H', 'dnt: 1',
-            '-H', 'connection: keep-alive',
-            '-H', 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-            url
-        ]
-        
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=35)
-            
-            if process.returncode == 0:
-                try:
-                    data = json.loads(stdout.decode('utf-8'))
-                    search_results = data.get("SearchResults", [])
-                    total_count = data.get("Count", 0)
-                    
-                    logger.debug(f"Curl API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
-                    return data, query, sort_option, page, limit
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON from curl response: {e}")
-                    logger.debug(f"Raw response: {stdout.decode('utf-8')[:500]}...")
-                    raise Exception(f"Invalid JSON response from curl: {e}")
-            else:
-                error_msg = stderr.decode('utf-8') if stderr else "Unknown curl error"
-                logger.error(f"Curl failed with return code {process.returncode}: {error_msg}")
-                raise Exception(f"Curl failed: {error_msg}")
-                
-        except asyncio.TimeoutError:
-            logger.error(f"Curl request timed out for page {page}")
-            raise Exception("Curl request timed out")
-        except Exception as e:
-            logger.error(f"Curl subprocess failed: {e}")
-            raise
-
-    async def search_premium_aiohttp(
-        self,
-        session,
-        page=0,
-        limit=500,
-        sort_option="PriceAsc",
-        query="q=(Or.CarType.N._.CarType.Y.)",
-        include_count=True,
-        max_retries=2,
-    ):
-        """Original aiohttp implementation"""
-        base_url = f"{self.BASE_URL}/premium"
-        url_parts = []
-
-        if include_count:
-            url_parts.append("count=true")
-        url_parts.append(query)
-
-        offset = page * limit
-        url_parts.append(f"sr=|{sort_option}|{offset}|{limit}")
-
-        url = f"{base_url}?{'&'.join(url_parts)}"
-        
-        logger.debug(f"Making aiohttp request to: {url}")
-
-        for attempt in range(max_retries):
-            try:
-                async with session.get(url) as response:
-                    if response.status == 407:
-                        logger.warning(f"Proxy auth required on attempt {attempt + 1}, switching to curl fallback")
-                        self.use_curl_fallback = True
-                        raise aiohttp.ClientProxyConnectionError("Proxy authentication required")
-                        
-                    response.raise_for_status()
-                    data = await response.json()
-                    
-                    search_results = data.get("SearchResults", [])
-                    total_count = data.get("Count", 0)
-                    
-                    logger.debug(f"Aiohttp API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
-                    
-                    return data, query, sort_option, page, limit
-                    
-            except aiohttp.ClientProxyConnectionError as e:
-                logger.warning(f"Proxy connection error on attempt {attempt + 1}: {e}")
-                self.use_curl_fallback = True
-                raise
-            except aiohttp.ClientError as e:
-                if "407" in str(e) or "proxy" in str(e).lower():
-                    logger.warning(f"Proxy error on attempt {attempt + 1}: {e}")
-                    self.use_curl_fallback = True
-                    raise
-                else:
-                    logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
-                    if attempt == max_retries - 1:
-                        raise
-            except Exception as e:
-                logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
-                if attempt == max_retries - 1:
-                    raise
-                await asyncio.sleep(1)
-
-        raise Exception(f"Failed after {max_retries} attempts")
 
     async def search_premium_async(
         self,
@@ -204,31 +56,39 @@ class EncarAPI:
         query="q=(Or.CarType.N._.CarType.Y.)",
         include_count=True,
     ):
-        """Main method that tries aiohttp first, then falls back to curl"""
+        base_url = f"{self.BASE_URL}/premium"
+        url_parts = []
+
+        if include_count:
+            url_parts.append("count=true")
+        url_parts.append(query)
+
+        offset = page * limit
+        url_parts.append(f"sr=|{sort_option}|{offset}|{limit}")
+
+        url = f"{base_url}?{'&'.join(url_parts)}"
         
-        if self.use_curl_fallback:
-            try:
-                return await self.search_premium_curl_fallback(page, limit, sort_option, query, include_count)
-            except Exception as e:
-                logger.warning(f"Curl fallback failed, trying aiohttp: {e}")
-                self.use_curl_fallback = False
-        
+        logger.debug(f"Making request to: {url}")
+
         try:
-            return await self.search_premium_aiohttp(session, page, limit, sort_option, query, include_count)
+            async with session.get(url) as response:
+                response.raise_for_status()
+                data = await response.json()
+                
+                search_results = data.get("SearchResults", [])
+                total_count = data.get("Count", 0)
+                
+                logger.debug(f"API Response - Page {page}: {len(search_results)} cars, Total: {total_count}")
+                
+                return data, query, sort_option, page, limit
+                
         except Exception as e:
-            if "407" in str(e) or "proxy" in str(e).lower() or isinstance(e, aiohttp.ClientProxyConnectionError):
-                logger.warning(f"Aiohttp failed with proxy error, falling back to curl: {e}")
-                try:
-                    return await self.search_premium_curl_fallback(page, limit, sort_option, query, include_count)
-                except Exception as curl_e:
-                    logger.error(f"Both aiohttp and curl failed. Aiohttp: {e}, Curl: {curl_e}")
-                    raise Exception(f"Both methods failed - Aiohttp: {e}, Curl: {curl_e}")
-            else:
-                raise
+            logger.error(f"API Request failed - Page {page}, Sort: {sort_option}, Query: {query[:30]}...: {e}")
+            raise
 
 
 class EncarParser:
-    def __init__(self, max_concurrent=5):
+    def __init__(self, max_concurrent=10):
         self.max_concurrent = max_concurrent
         self.api = EncarAPI()
 
@@ -331,7 +191,7 @@ class EncarParser:
         logger.debug(f"Config {config_name} - Max pages: {estimated_max_pages}")
 
         while (
-            consecutive_failures < 5
+            consecutive_failures < 3
             and consecutive_empty_pages < 3
             and consecutive_duplicate_pages < 2
             and page < estimated_max_pages
@@ -378,27 +238,15 @@ class EncarParser:
                     logger.info(f"{config_name} - Progress: {page} pages, {len(all_cars)} cars")
 
                 page += 1
-                
-                if self.api.use_curl_fallback:
-                    await asyncio.sleep(0.2)
-                else:
-                    await asyncio.sleep(0.1)
+                await asyncio.sleep(0.03)
 
             except Exception as e:
                 consecutive_failures += 1
                 logger.error(f"{config_name} - Page {page} failed (consecutive: {consecutive_failures}): {e}")
                 page += 1
-                await asyncio.sleep(2)
 
-        method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
-        logger.info(f"{config_name} completed using {method_used}: {len(all_cars)} cars from {page} pages")
+        logger.info(f"{config_name} completed: {len(all_cars)} cars from {page} pages")
         return all_cars, config_name
-
-    def _create_ssl_context(self):
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        return ssl_context
 
     async def parse_all_configurations(self):
         session_id = str(uuid.uuid4())
@@ -409,22 +257,10 @@ class EncarParser:
 
         try:
             headers = self.api._setup_headers()
-            
             connector = aiohttp.TCPConnector(
-                limit=self.max_concurrent,
-                limit_per_host=self.max_concurrent,
-                ttl_dns_cache=300,
-                use_dns_cache=True,
-                ssl=False,
-                enable_cleanup_closed=True,
-                keepalive_timeout=30,
+                limit=self.max_concurrent, limit_per_host=self.max_concurrent
             )
-            
-            timeout = aiohttp.ClientTimeout(
-                total=60,
-                connect=30,
-                sock_read=30
-            )
+            timeout = aiohttp.ClientTimeout(total=30)
             
             logger.info(f"HTTP session configured - Concurrent limit: {self.max_concurrent}")
 
@@ -433,10 +269,7 @@ class EncarParser:
             total_configs = len(self.queries) * len(self.sort_options) * len(self.page_sizes)
 
             async with aiohttp.ClientSession(
-                headers=headers, 
-                connector=connector, 
-                timeout=timeout,
-                trust_env=False,
+                headers=headers, connector=connector, timeout=timeout
             ) as session:
                 logger.info(f"HTTP session started")
                 
@@ -452,7 +285,7 @@ class EncarParser:
                 logger.info(f"Created {len(tasks)} configuration tasks")
                 logger.info(f"Starting parallel execution...")
 
-                batch_size = min(self.max_concurrent, 8)
+                batch_size = min(self.max_concurrent, 20)
                 
                 for i in range(0, len(tasks), batch_size):
                     batch = tasks[i:i + batch_size]
@@ -485,21 +318,18 @@ class EncarParser:
                             if completed_configs % 10 == 0:
                                 elapsed = (datetime.now() - start_time).total_seconds()
                                 progress = (completed_configs / total_configs) * 100
-                                method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
-                                logger.info(f"Progress: {completed_configs}/{total_configs} ({progress:.1f}%) - {len(all_current_cars)} unique cars - {elapsed:.1f}s elapsed - Method: {method_used}")
+                                logger.info(f"Progress: {completed_configs}/{total_configs} ({progress:.1f}%) - {len(all_current_cars)} unique cars - {elapsed:.1f}s elapsed")
                         
                         if i + batch_size < len(tasks):
-                            delay = 3 if self.api.use_curl_fallback else 2
-                            await asyncio.sleep(delay)
+                            await asyncio.sleep(1)
                             
                     except Exception as e:
                         logger.error(f"Batch {batch_num} failed: {e}")
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            method_used = "curl" if self.api.use_curl_fallback else "aiohttp"
             
-            logger.info(f"Parse session completed using {method_used}!")
+            logger.info(f"Parse session completed!")
             logger.info(f"Duration: {duration:.2f} seconds ({duration/60:.1f} minutes)")
             logger.info(f"Total unique cars found: {len(all_current_cars)}")
             logger.info(f"Configurations completed: {completed_configs}/{total_configs}")
