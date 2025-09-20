@@ -199,7 +199,7 @@
     border-radius: 6px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .car-detail {
         grid-template-columns: 1fr;
     }
@@ -208,7 +208,9 @@
         border-left: none;
         border-top: 1px solid #eee;
     }
+}
 
+@media (max-width: 768px) {
     .specs-grid,
     .dealer-details {
         grid-template-columns: 1fr;
@@ -218,4 +220,3 @@
         height: 250px;
     }
 }
-  

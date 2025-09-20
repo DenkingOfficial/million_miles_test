@@ -77,6 +77,12 @@
     cursor: not-allowed;
 }
 
+@media (max-width: 992px) {
+    .content {
+        grid-template-columns: 240px 1fr;
+    }
+}
+
 @media (max-width: 768px) {
     .content {
         grid-template-columns: 1fr;
