@@ -1,0 +1,6 @@
+celery[redis]
+psycopg2-binary
+sqlalchemy
+aiohttp
+python-dateutil
+redis

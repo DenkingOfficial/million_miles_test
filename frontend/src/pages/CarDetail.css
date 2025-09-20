@@ -1,0 +1,221 @@
+.car-detail-page {
+    min-height: 100vh;
+    background-color: #f8f9fa;
+    padding: 20px 0;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.car-detail {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+}
+
+.car-images {
+    padding: 20px;
+}
+
+.main-image {
+    width: 100%;
+    height: 400px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #f5f5f5;
+}
+
+.main-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-thumbnails {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 5px 0;
+}
+
+.image-thumbnails img {
+    width: 80px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    border: 2px solid transparent;
+}
+
+.image-thumbnails img:hover,
+.image-thumbnails img.active {
+    opacity: 1;
+    border-color: #007bff;
+}
+
+.car-info {
+    padding: 30px;
+    border-left: 1px solid #eee;
+}
+
+.car-header {
+    margin-bottom: 25px;
+}
+
+.car-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 10px 0;
+}
+
+.car-price {
+    font-size: 32px;
+    font-weight: 700;
+    color: #e74c3c;
+}
+
+.car-badge {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.car-badge h2 {
+    font-size: 20px;
+    color: #333;
+    margin: 0 0 5px 0;
+}
+
+.car-badge p {
+    color: #666;
+    margin: 0;
+}
+
+.car-specs,
+.dealer-info,
+.service-marks,
+.condition-info {
+    margin-bottom: 25px;
+}
+
+.car-specs h3,
+.dealer-info h3,
+.service-marks h3,
+.condition-info h3 {
+    font-size: 18px;
+    color: #333;
+    margin: 0 0 15px 0;
+    font-weight: 600;
+}
+
+.specs-grid,
+.dealer-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.spec-item,
+.dealer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.spec-item label,
+.dealer-item label {
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.spec-item span,
+.dealer-item span {
+    color: #333;
+    font-size: 14px;
+}
+
+.marks,
+.conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mark,
+.condition {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.condition {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.loading,
+.error-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.error-message .back-link {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+    .car-detail {
+        grid-template-columns: 1fr;
+    }
+
+    .car-info {
+        border-left: none;
+        border-top: 1px solid #eee;
+    }
+
+    .specs-grid,
+    .dealer-details {
+        grid-template-columns: 1fr;
+    }
+
+    .main-image {
+        height: 250px;
+    }
+}
+  

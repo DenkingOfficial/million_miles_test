@@ -1,0 +1,114 @@
+import React, { useState, useEffect } from 'react';
+import CarCard from '../components/CarCard';
+import Filters from '../components/Filters';
+import { carService } from '../services/api';
+import './CarList.css';
+
+const CarList = () => {
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({});
+  const [hasMore, setHasMore] = useState(true);
+
+  useEffect(() => {
+    loadCars();
+  }, [filters]);
+
+  const loadCars = async (offset = 0) => {
+    try {
+      setLoading(true);
+      const carsData = await carService.getCars({ 
+        ...filters, 
+        offset,
+        limit: 20 
+      });
+
+      console.log(carsData)
+      
+      if (offset === 0) {
+        setCars(carsData);
+      } else {
+        setCars(prev => [...prev, ...carsData]);
+      }
+      
+      setHasMore(carsData.length === 20);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load car listings.');
+      console.error('Error loading cars:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      loadCars(cars.length);
+    }
+  };
+
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  if (error) {
+    return (
+      <div className="error-message">
+        <p>{error}</p>
+        <button onClick={() => loadCars()}>Попробовать снова</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="car-list-page">
+      <div className="container">
+        <h1>Парсинг Encar</h1>
+        
+        <div className="content">
+          <aside>
+            <Filters 
+              onFiltersChange={handleFiltersChange}
+              currentFilters={filters}
+            />
+          </aside>
+
+          <main className="main-content">
+            {loading && cars.length === 0 ? (
+              <div className="loading">Загрузка объявлений...</div>
+            ) : (
+              <>
+                <div className="cars-grid">
+                  {cars.map(car => (
+                    <CarCard key={car.id} car={car} />
+                  ))}
+                </div>
+
+                {cars.length === 0 && !loading && (
+                  <div className="no-results">
+                    Нет авто по вашим критериям.
+                  </div>
+                )}
+
+                {hasMore && cars.length > 0 && (
+                  <div className="load-more">
+                    <button 
+                      onClick={loadMore} 
+                      disabled={loading}
+                      className="load-more-btn"
+                    >
+                      {loading ? 'Загрузка...' : 'Показать больше'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CarList;

@@ -1,0 +1,7 @@
+backend/.venv/
+backend/.env
+frontend/.env
+parser/.venv/
+.env
+.DS_Store
+frontend/.env.production
