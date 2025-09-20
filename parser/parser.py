@@ -43,6 +43,9 @@ class EncarAPI:
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
+            "DNT": "1",
+            "Priority": "u=1, i",
+            "Connection": "keep-alive",
         }
         logger.debug(f"🔧 Setup headers: {len(headers)} headers configured")
         return headers
