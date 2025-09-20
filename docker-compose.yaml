@@ -38,7 +38,7 @@ services:
     ports:
       - "1080:1080"
       - "8080:8080"
-    command: "v2ray run /etc/v2ray/config.json"
+    command: "run /etc/v2ray/config.json"
 
   celery_worker:
     build: ./parser
