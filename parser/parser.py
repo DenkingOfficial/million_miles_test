@@ -32,7 +32,7 @@ class EncarAPI:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+            "Accept-Language": "ko-KR,en;q=0.9,ru;q=0.8",
             "Cache-Control": "no-cache",
             "Origin": "https://www.encar.com",
             "Pragma": "no-cache",

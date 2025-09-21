@@ -30,7 +30,7 @@ const CarDetail = () => {
 
   const formatPrice = (price) => {
     if (!price) return 'N/A';
-    return `₩${price.toLocaleString()}0,000`;
+    return `₩${(price * 10000).toLocaleString()}`;
   };
 
   const formatMileage = (mileage) => {

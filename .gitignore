@@ -7,3 +7,7 @@ parser/.venv/
 frontend/.env.production
 database/
 proxy/config.json
+parser/celerybeat-schedule
+parser/celerybeat-schedule-shm
+parser/celerybeat-schedule-wal
+parser/current_cars.json

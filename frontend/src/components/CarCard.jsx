@@ -5,7 +5,7 @@ import './CarCard.css';
 const CarCard = ({ car }) => {
   const formatPrice = (price) => {
     if (!price) return 'N/A';
-    return `₩${price.toLocaleString()}0,000`;
+    return `₩${(price * 10000).toLocaleString()}`;
   };
 
   const formatMileage = (mileage) => {
@@ -22,8 +22,8 @@ const CarCard = ({ car }) => {
     <div className="car-card">
       <Link to={`/cars/${car.id}`} className="car-card-link">
         <div className="car-image">
-          <img 
-            src={getImageUrl(car.photo)} 
+          <img
+            src={getImageUrl(car.photo)}
             alt={`${car.manufacturer} ${car.model}`}
             onError={(e) => {
               e.target.src = '/placeholder-car.jpg';
